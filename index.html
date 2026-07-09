@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>密語 CIPHERLINE — 端對端加密通訊</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12141A;
+    --panel:#1B1F2A;
+    --panel-2:#20263380;
+    --border:#2A2F3D;
+    --paper:#ECEFF4;
+    --muted:#8B92A5;
+    --amber:#E8A33D;
+    --amber-dim:#E8A33D33;
+    --teal:#4FD1C5;
+    --teal-dim:#4FD1C533;
+    --red:#E5484D;
+    --red-dim:#E5484D33;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, #1c2130 0%, transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, #1a2a28 0%, transparent 55%),
+      var(--ink);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:32px 18px 60px;
+  }
+  ::selection{background:var(--amber-dim);color:var(--paper);}
+  a{color:var(--teal);}
+
+  .topbar{
+    width:100%;
+    max-width:640px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:28px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.12em;
+    color:var(--muted);
+    text-transform:uppercase;
+  }
+  .topbar .brand{
+    display:flex;align-items:center;gap:8px;
+    color:var(--paper);
+    font-size:13px;
+  }
+  .diamond{
+    width:7px;height:7px;background:var(--amber);
+    transform:rotate(45deg);
+    display:inline-block;
+  }
+  .status-pill{
+    display:flex;align-items:center;gap:7px;
+    padding:5px 10px;
+    border:1px solid var(--border);
+    border-radius:999px;
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--muted);
+    box-shadow:0 0 0 0 currentColor;
+  }
+  .dot.connecting{background:var(--amber);color:var(--amber);animation:pulse 1.4s infinite;}
+  .dot.connected{background:var(--teal);color:var(--teal);}
+  .dot.offline{background:var(--red);color:var(--red);}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 currentColor;opacity:1;}
+    70%{box-shadow:0 0 0 6px transparent;opacity:.4;}
+    100%{box-shadow:0 0 0 0 transparent;opacity:1;}
+  }
+
+  .card{
+    width:100%;
+    max-width:640px;
+    background:linear-gradient(180deg,var(--panel),#171B24);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:38px 34px;
+    position:relative;
+    overflow:hidden;
+  }
+  .card::before{
+    content:"";
+    position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,var(--amber-dim),transparent);
+  }
+
+  /* ---------- Hero / landing ---------- */
+  .hero{text-align:center;}
+  .hero h1{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:56px;
+    margin:6px 0 4px;
+    letter-spacing:.01em;
+  }
+  .scramble-sub{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    letter-spacing:.18em;
+    color:var(--amber);
+    text-transform:uppercase;
+    margin-bottom:22px;
+    min-height:16px;
+  }
+  .tagline{
+    color:var(--muted);
+    font-size:15px;
+    line-height:1.7;
+    max-width:440px;
+    margin:0 auto 30px;
+  }
+  .tagline b{color:var(--paper);font-weight:600;}
+
+  .btn-row{
+    display:flex;gap:12px;justify-content:center;
+    flex-wrap:wrap;
+    margin-bottom:34px;
+  }
+  button{
+    font-family:'Inter',sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    cursor:pointer;
+    border-radius:8px;
+    padding:13px 22px;
+    border:1px solid var(--border);
+    background:transparent;
+    color:var(--paper);
+    transition:.15s ease;
+  }
+  button:hover{border-color:var(--amber);}
+  button:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+  button.primary{
+    background:var(--amber);
+    color:#1a1305;
+    border-color:var(--amber);
+  }
+  button.primary:hover{filter:brightness(1.08);}
+  button.ghost{color:var(--muted);border-color:transparent;}
+  button.ghost:hover{color:var(--paper);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.danger{border-color:var(--red-dim);color:var(--red);}
+  button.danger:hover{border-color:var(--red);}
+
+  .steps-caption{
+    display:flex;
+    gap:22px;
+    justify-content:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    letter-spacing:.04em;
+    flex-wrap:wrap;
+  }
+  .steps-caption span b{color:var(--paper);}
+
+  /* ---------- Wizard views ---------- */
+  .view{display:none;}
+  .view.active{display:block;}
+  .step-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.16em;
+    color:var(--amber);
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  .step-title{
+    font-family:'Fraunces',serif;
+    font-size:24px;
+    font-weight:600;
+    margin:0 0 10px;
+  }
+  .step-desc{
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.65;
+    margin-bottom:18px;
+  }
+  textarea, input[type=text]{
+    width:100%;
+    background:#0F1218;
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--paper);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    padding:14px;
+    resize:none;
+  }
+  textarea:focus, input[type=text]:focus{
+    outline:none;border-color:var(--amber);
+  }
+  .code-block{height:100px;margin-bottom:10px;}
+  .field-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
+  .hint{
+    font-size:12px;color:var(--muted);margin-top:8px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .hint.warn{color:var(--amber);}
+  .copy-wrap{position:relative;}
+  .copy-btn{
+    position:absolute;top:10px;right:10px;
+    padding:6px 10px;font-size:11.5px;
+    background:var(--panel);
+  }
+  .back-link{
+    background:none;border:none;color:var(--muted);
+    font-size:12.5px;padding:0;margin-bottom:20px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .back-link:hover{color:var(--paper);}
+
+  .spinner{
+    width:14px;height:14px;border-radius:50%;
+    border:2px solid var(--border);
+    border-top-color:var(--amber);
+    animation:spin .8s linear infinite;
+    display:inline-block;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ---------- Chat view ---------- */
+  .chat-card{padding:0;overflow:hidden;}
+  .chat-header{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:16px 20px;
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap;gap:10px;
+  }
+  .chat-header .left{display:flex;align-items:center;gap:10px;}
+  .chat-header .title{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
+  .safety-toggle{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;
+    color:var(--muted);background:none;border:none;
+    text-decoration:underline;text-underline-offset:3px;
+    padding:0;
+  }
+  .safety-panel{
+    display:none;
+    padding:16px 20px;
+    background:#0F1218;
+    border-bottom:1px solid var(--border);
+  }
+  .safety-panel.open{display:block;}
+  .safety-panel p{margin:0 0 10px;color:var(--muted);font-size:12.5px;line-height:1.6;}
+  .nixie-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .nixie{
+    font-family:'IBM Plex Mono',monospace;
+    background:#161A22;
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:8px 10px;
+    font-size:15px;
+    letter-spacing:.08em;
+    color:var(--amber);
+    text-shadow:0 0 8px var(--amber-dim);
+  }
+  .messages{
+    height:380px;
+    overflow-y:auto;
+    padding:20px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .msg{
+    max-width:78%;
+    padding:10px 13px;
+    border-radius:10px;
+    font-size:14.5px;
+    line-height:1.5;
+    word-wrap:break-word;
+  }
+  .msg .meta{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;color:var(--muted);
+    margin-top:4px;display:block;
+  }
+  .msg.me{
+    align-self:flex-end;
+    background:var(--amber-dim);
+    border:1px solid var(--amber-dim);
+    border-color:#E8A33D55;
+  }
+  .msg.peer{
+    align-self:flex-start;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+  }
+  .msg.sys{
+    align-self:center;
+    background:none;
+    color:var(--muted);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+  }
+  .composer{
+    display:flex;gap:10px;
+    padding:14px 16px;
+    border-top:1px solid var(--border);
+  }
+  .composer input{
+    flex:1;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+  }
+  .leave-btn{margin-top:0;}
+
+  footer{
+    margin-top:30px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:#5A6070;
+    text-align:center;
+    max-width:640px;
+    line-height:1.7;
+  }
+
+  @media (max-width:480px){
+    .hero h1{font-size:40px;}
+    .card{padding:28px 20px;}
+    .messages{height:320px;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .dot.connecting{animation:none;}
+    .spinner{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand"><span class="diamond"></span> CIPHERLINE</div>
+    <div class="status-pill"><span class="dot offline" id="statusDot"></span><span id="statusText">未連線</span></div>
+  </div>
+
+  <!-- LANDING -->
+  <div class="card view active" id="view-landing">
+    <div class="hero">
+      <div class="scramble-sub" id="scrambleSub">END-TO-END ENCRYPTED CHANNEL</div>
+      <h1 id="scrambleTitle">密語</h1>
+      <p class="tagline">兩人之間直接建立 <b>瀏覽器對瀏覽器</b> 的加密連線。金鑰只存在於你們的裝置上，<b>沒有伺服器、沒有帳號、沒有訊息紀錄</b>。關掉分頁，一切就消失。</p>
+      <div class="btn-row">
+        <button class="primary" id="btnCreate">建立安全頻道</button>
+        <button id="btnJoin">加入頻道</button>
+      </div>
+      <div class="steps-caption">
+        <span><b>1.</b> 產生邀請碼</span>
+        <span><b>2.</b> 透過任意管道傳給對方</span>
+        <span><b>3.</b> 雙方核對驗證碼即可通訊</span>
+      </div>
+      <button class="safety-toggle" id="toggleAdvanced" style="margin-top:26px;">進階設定（TURN 中繼伺服器）</button>
+      <div class="safety-panel" id="advancedPanel" style="text-align:left;border-radius:8px;border:1px solid var(--border);margin-top:12px;">
+        <p>若雙方都在嚴格 NAT／公司防火牆環境下，僅用 STUN 可能無法直連，此時需要 <b style="color:var(--paper)">TURN 中繼伺服器</b>協助轉發（TURN 只轉發已加密的資料，看不到明文內容）。可填入你自己的 TURN 帳號，或留空僅用預設 STUN。</p>
+        <div class="field-row" style="margin-top:0;">
+          <input type="text" id="turnUrl" placeholder="turn:your-turn-server.com:3478" style="flex:1;min-width:200px;">
+        </div>
+        <div class="field-row">
+          <input type="text" id="turnUser" placeholder="使用者名稱" style="flex:1;min-width:120px;">
+          <input type="text" id="turnCred" placeholder="密碼／credential" style="flex:1;min-width:120px;">
+        </div>
+        <div class="hint" id="turnHint">設定會保存在瀏覽器本機（localStorage），不會上傳到任何地方。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE STEP 1: generate invite -->
+  <div class="card view" id="view-create1">
+    <button class="back-link" data-back="landing">← 返回</button>
+    <div class="step-label">建立頻道 · 步驟 1 / 2</div>
+    <h2 class="step-title">產生邀請碼</h2>
+    <p class="step-desc">複製下方邀請碼，透過任何管道（Email、其他通訊軟體、當面）傳送給對方。這段內容已包含你的加密公鑰，本身無法用來讀取你之後的訊息。</p>
+    <div class="copy-wrap">
+      <textarea class="code-block" id="offerCode" readonly placeholder="產生中…"></textarea>
+      <button class="copy-btn" id="copyOffer">複製</button>
+    </div>
+    <div class="hint" id="offerHint"><span class="spinner"></span> 正在收集連線資訊…</div>
+    <div class="field-row" style="margin-top:24px;">
+      <div style="flex:1;min-width:220px;">
+        <div class="step-label" style="margin-bottom:6px;">步驟 2 / 2</div>
+        <p class="step-desc" style="margin-bottom:10px;">收到對方回覆的「回應碼」後，貼在這裡並連線：</p>
+        <textarea class="code-block" id="answerInput" placeholder="貼上對方的回應碼…"></textarea>
+      </div>
+    </div>
+    <div class="field-row">
+      <button class="primary" id="btnConnectOfferer">連線</button>
+      <span class="hint" id="connectHintOfferer"></span>
+    </div>
+  </div>
+
+  <!-- JOIN STEP 1: paste invite -->
+  <div class="card view" id="view-join1">
+    <button class="back-link" data-back="landing">← 返回</button>
+    <div class="step-label">加入頻道 · 步驟 1 / 2</div>
+    <h2 class="step-title">貼上邀請碼</h2>
+    <p class="step-desc">把對方傳給你的邀請碼貼在這裡。</p>
+    <textarea class="code-block" id="offerInput" placeholder="貼上對方的邀請碼…"></textarea>
+    <div class="field-row">
+      <button class="primary" id="btnGenAnswer">產生回應碼</button>
+      <span class="hint" id="joinHint1"></span>
+    </div>
+  </div>
+
+  <!-- JOIN STEP 2: send back answer -->
+  <div class="card view" id="view-join2">
+    <div class="step-label">加入頻道 · 步驟 2 / 2</div>
+    <h2 class="step-title">傳回回應碼</h2>
+    <p class="step-desc">把下方回應碼傳回給對方，對方貼入後連線就會自動建立。</p>
+    <div class="copy-wrap">
+      <textarea class="code-block" id="answerCode" readonly placeholder="產生中…"></textarea>
+      <button class="copy-btn" id="copyAnswer">複製</button>
+    </div>
+    <div class="hint" id="joinHint2"><span class="spinner"></span> 等待對方連線…</div>
+  </div>
+
+  <!-- CHAT -->
+  <div class="card chat-card view" id="view-chat">
+    <div class="chat-header">
+      <div class="left">
+        <span class="dot connected"></span>
+        <span class="title">安全頻道</span>
+      </div>
+      <button class="safety-toggle" id="toggleSafety">顯示驗證碼</button>
+    </div>
+    <div class="safety-panel" id="safetyPanel">
+      <p>請透過語音、視訊或其他管道口頭核對這組驗證碼，確認雙方金鑰完全一致、沒有第三方介入（中間人攻擊）。</p>
+      <div class="nixie-row" id="nixieRow"></div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="composer">
+      <input type="text" id="msgInput" placeholder="輸入訊息…" autocomplete="off">
+      <button class="primary" id="btnSend">送出</button>
+      <button class="danger leave-btn" id="btnLeave">離開</button>
+    </div>
+  </div>
+
+  <footer>
+    所有加密與金鑰運算皆在你的瀏覽器內完成，訊息以 ECDH（P-256）+ AES-256-GCM 加密後直接透過 WebRTC 資料通道傳輸。<br>
+    僅使用公用 STUN 伺服器協助建立連線，不經任何訊息伺服器中繼或儲存。嚴格 NAT / 防火牆環境可能無法連線。
+  </footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- utils ----------
+  const $ = (id) => document.getElementById(id);
+  const views = ['landing','create1','join1','join2','chat'];
+  function showView(name){
+    views.forEach(v => $('view-'+v).classList.toggle('active', v===name));
+  }
+  function setStatus(state, text){
+    const dot = $('statusDot');
+    dot.className = 'dot ' + state;
+    $('statusText').textContent = text;
+  }
+  function b64encode(str){ return btoa(str); }
+  function b64decode(str){ return atob(str); }
+  function bufToB64(buf){
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for (let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function b64ToBuf(b64){
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  async function copyText(text, btn){
+    try{
+      await navigator.clipboard.writeText(text);
+    }catch(e){
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    if(btn){
+      const orig = btn.textContent;
+      btn.textContent = '已複製 ✓';
+      setTimeout(()=>btn.textContent = orig, 1400);
+    }
+  }
+
+  // ---------- scramble hero text ----------
+  (function scramble(){
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const titleEl = $('scrambleTitle');
+    const subEl = $('scrambleSub');
+    const finalTitle = '密語';
+    const finalSub = 'END-TO-END ENCRYPTED CHANNEL';
+    if(reduce){ titleEl.textContent = finalTitle; subEl.textContent = finalSub; return; }
+    const glyphs = 'абвгдαβγδθΣΨΩ01λ⌘※#$%&*+=<>▓▒░'.split('');
+    function run(el, final, duration){
+      const len = final.length;
+      const start = performance.now();
+      function frame(now){
+        const t = Math.min(1, (now-start)/duration);
+        let out = '';
+        for(let i=0;i<len;i++){
+          const charProgress = t*len - i*0.55;
+          if(charProgress >= 1){ out += final[i]; }
+          else if(charProgress <= 0){ out += (final[i]===' ') ? ' ' : glyphs[Math.floor(Math.random()*glyphs.length)]; }
+          else { out += (final[i]===' ') ? ' ' : glyphs[Math.floor(Math.random()*glyphs.length)]; }
+        }
+        el.textContent = out;
+        if(t < 1) requestAnimationFrame(frame); else el.textContent = final;
+      }
+      requestAnimationFrame(frame);
+    }
+    run(titleEl, finalTitle, 900);
+    run(subEl, finalSub, 1200);
+  })();
+
+  // ---------- crypto helpers ----------
+  async function genKeyPair(){
+    return crypto.subtle.generateKey({name:'ECDH', namedCurve:'P-256'}, true, ['deriveKey']);
+  }
+  async function exportPubJwk(publicKey){
+    return crypto.subtle.exportKey('jwk', publicKey);
+  }
+  async function exportPubRaw(publicKey){
+    return crypto.subtle.exportKey('raw', publicKey);
+  }
+  async function importPeerPub(jwk){
+    return crypto.subtle.importKey('jwk', jwk, {name:'ECDH', namedCurve:'P-256'}, true, []);
+  }
+  async function deriveSharedKey(privateKey, peerPublicKey){
+    return crypto.subtle.deriveKey(
+      {name:'ECDH', public: peerPublicKey},
+      privateKey,
+      {name:'AES-GCM', length:256},
+      false,
+      ['encrypt','decrypt']
+    );
+  }
+  async function encryptMsg(key, plaintext){
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(plaintext));
+    return { iv: bufToB64(iv), ct: bufToB64(ct) };
+  }
+  async function decryptMsg(key, payload){
+    const iv = new Uint8Array(b64ToBuf(payload.iv));
+    const ctBuf = b64ToBuf(payload.ct);
+    const plainBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ctBuf);
+    return new TextDecoder().decode(plainBuf);
+  }
+  function compareBytes(a, b){
+    const la = a.length, lb = b.length, l = Math.min(la,lb);
+    for(let i=0;i<l;i++){ if(a[i]!==b[i]) return a[i]-b[i]; }
+    return la-lb;
+  }
+  async function computeSafetyNumber(myRaw, peerRaw){
+    const a = new Uint8Array(myRaw), b = new Uint8Array(peerRaw);
+    const [first, second] = compareBytes(a,b) <= 0 ? [a,b] : [b,a];
+    const concat = new Uint8Array(first.length + second.length);
+    concat.set(first,0); concat.set(second, first.length);
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', concat));
+    const bytes = digest.slice(0,10);
+    const digitStr = Array.from(bytes).map(b=>String(b).padStart(3,'0')).join('');
+    const groups = digitStr.match(/.{1,5}/g);
+    return groups;
+  }
+
+  // ---------- WebRTC state ----------
+  const STUN_SERVERS = [{urls:'stun:stun.l.google.com:19302'}, {urls:'stun:stun1.l.google.com:19302'}];
+  function getIceServers(){
+    const servers = STUN_SERVERS.slice();
+    const url = $('turnUrl').value.trim();
+    const user = $('turnUser').value.trim();
+    const cred = $('turnCred').value.trim();
+    if(url){
+      const entry = { urls: url };
+      if(user) entry.username = user;
+      if(cred) entry.credential = cred;
+      servers.push(entry);
+    }
+    return servers;
+  }
+  let pc = null, dc = null, keyPair = null, sharedKey = null, peerPubRaw = null, myPubRaw = null;
+  let role = null;
+
+  // ---------- advanced TURN settings ----------
+  (function initAdvanced(){
+    try{
+      const saved = JSON.parse(localStorage.getItem('cipherline_turn') || '{}');
+      if(saved.url) $('turnUrl').value = saved.url;
+      if(saved.user) $('turnUser').value = saved.user;
+      if(saved.cred) $('turnCred').value = saved.cred;
+    }catch(e){}
+    $('toggleAdvanced').addEventListener('click', () => {
+      const panel = $('advancedPanel');
+      panel.classList.toggle('open');
+      $('toggleAdvanced').textContent = panel.classList.contains('open') ? '隱藏進階設定' : '進階設定（TURN 中繼伺服器）';
+    });
+    ['turnUrl','turnUser','turnCred'].forEach(id => {
+      $(id).addEventListener('change', () => {
+        localStorage.setItem('cipherline_turn', JSON.stringify({
+          url: $('turnUrl').value.trim(),
+          user: $('turnUser').value.trim(),
+          cred: $('turnCred').value.trim()
+        }));
+      });
+    });
+  })();
+
+  function waitIceComplete(peerConn){
+    return new Promise((resolve)=>{
+      if(peerConn.iceGatheringState === 'complete'){ resolve(); return; }
+      const timer = setTimeout(()=>resolve(), 6000); // safety timeout
+      peerConn.addEventListener('icegatheringstatechange', function check(){
+        if(peerConn.iceGatheringState === 'complete'){
+          clearTimeout(timer);
+          peerConn.removeEventListener('icegatheringstatechange', check);
+          resolve();
+        }
+      });
+    });
+  }
+
+  function newPeerConnection(){
+    const conn = new RTCPeerConnection({iceServers: getIceServers()});
+    conn.oniceconnectionstatechange = () => {
+      if(['failed','disconnected','closed'].includes(conn.iceConnectionState)){
+        setStatus('offline', '連線中斷');
+      }
+    };
+    return conn;
+  }
+
+  function setupDataChannelHandlers(channel){
+    channel.onopen = async () => {
+      setStatus('connected', '已連線 · 已加密');
+      await renderSafetyNumber();
+      addSysMsg('安全通道已建立，訊息已使用端對端加密。');
+      showView('chat');
+      $('msgInput').focus();
+    };
+    channel.onclose = () => setStatus('offline', '連線已關閉');
+    channel.onmessage = async (ev) => {
+      try{
+        const payload = JSON.parse(ev.data);
+        const text = await decryptMsg(sharedKey, payload);
+        addMsg(text, 'peer');
+      }catch(e){
+        console.error('decrypt failed', e);
+      }
+    };
+  }
+
+  async function renderSafetyNumber(){
+    const groups = await computeSafetyNumber(myPubRaw, peerPubRaw);
+    const row = $('nixieRow');
+    row.innerHTML = '';
+    groups.forEach(g => {
+      const d = document.createElement('div');
+      d.className = 'nixie';
+      d.textContent = g;
+      row.appendChild(d);
+    });
+  }
+
+  function addMsg(text, who){
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + who;
+    const body = document.createElement('div');
+    body.textContent = text;
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = (who==='me' ? '你' : '對方') + ' · ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+    wrap.appendChild(body); wrap.appendChild(meta);
+    $('messages').appendChild(wrap);
+    $('messages').scrollTop = $('messages').scrollHeight;
+  }
+  function addSysMsg(text){
+    const wrap = document.createElement('div');
+    wrap.className = 'msg sys';
+    wrap.textContent = text;
+    $('messages').appendChild(wrap);
+    $('messages').scrollTop = $('messages').scrollHeight;
+  }
+
+  // ---------- Create (offerer) flow ----------
+  $('btnCreate').addEventListener('click', async () => {
+    showView('create1');
+    setStatus('connecting', '產生邀請碼中…');
+    role = 'offerer';
+    keyPair = await genKeyPair();
+    myPubRaw = await exportPubRaw(keyPair.publicKey);
+    pc = newPeerConnection();
+    dc = pc.createDataChannel('cipherline');
+    setupDataChannelHandlers(dc);
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitIceComplete(pc);
+
+    const jwk = await exportPubJwk(keyPair.publicKey);
+    const bundle = { t:'offer', sdp: pc.localDescription.sdp, pub: jwk };
+    $('offerCode').value = b64encode(JSON.stringify(bundle));
+    $('offerHint').innerHTML = '✓ 邀請碼已就緒，可以複製傳送了。';
+  });
+
+  $('copyOffer').addEventListener('click', () => copyText($('offerCode').value, $('copyOffer')));
+
+  $('btnConnectOfferer').addEventListener('click', async () => {
+    const raw = $('answerInput').value.trim();
+    const hint = $('connectHintOfferer');
+    if(!raw){ hint.textContent = '請先貼上對方的回應碼'; hint.classList.add('warn'); return; }
+    try{
+      const bundle = JSON.parse(b64decode(raw));
+      if(bundle.t !== 'answer') throw new Error('type mismatch');
+      const peerPubKey = await importPeerPub(bundle.pub);
+      peerPubRaw = await exportPubRaw(peerPubKey);
+      sharedKey = await deriveSharedKey(keyPair.privateKey, peerPubKey);
+      await pc.setRemoteDescription({type:'answer', sdp: bundle.sdp});
+      hint.textContent = '連線中…';
+      hint.classList.remove('warn');
+    }catch(e){
+      console.error(e);
+      hint.textContent = '回應碼格式錯誤，請確認完整複製貼上。';
+      hint.classList.add('warn');
+    }
+  });
+
+  // ---------- Join (answerer) flow ----------
+  $('btnJoin').addEventListener('click', () => { showView('join1'); });
+
+  $('btnGenAnswer').addEventListener('click', async () => {
+    const raw = $('offerInput').value.trim();
+    const hint = $('joinHint1');
+    if(!raw){ hint.textContent = '請先貼上邀請碼'; hint.classList.add('warn'); return; }
+    let bundle;
+    try{
+      bundle = JSON.parse(b64decode(raw));
+      if(bundle.t !== 'offer') throw new Error('type mismatch');
+    }catch(e){
+      hint.textContent = '邀請碼格式錯誤，請確認完整複製貼上。';
+      hint.classList.add('warn');
+      return;
+    }
+    hint.textContent = '';
+    role = 'answerer';
+    setStatus('connecting', '建立連線中…');
+    keyPair = await genKeyPair();
+    myPubRaw = await exportPubRaw(keyPair.publicKey);
+    const peerPubKey = await importPeerPub(bundle.pub);
+    peerPubRaw = await exportPubRaw(peerPubKey);
+    sharedKey = await deriveSharedKey(keyPair.privateKey, peerPubKey);
+
+    pc = newPeerConnection();
+    pc.ondatachannel = (ev) => { dc = ev.channel; setupDataChannelHandlers(dc); };
+
+    await pc.setRemoteDescription({type:'offer', sdp: bundle.sdp});
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await waitIceComplete(pc);
+
+    const jwk = await exportPubJwk(keyPair.publicKey);
+    const outBundle = { t:'answer', sdp: pc.localDescription.sdp, pub: jwk };
+    $('answerCode').value = b64encode(JSON.stringify(outBundle));
+    showView('join2');
+  });
+
+  $('copyAnswer').addEventListener('click', () => copyText($('answerCode').value, $('copyAnswer')));
+
+  // ---------- back links ----------
+  document.querySelectorAll('[data-back]').forEach(btn=>{
+    btn.addEventListener('click', () => showView(btn.dataset.back));
+  });
+
+  // ---------- chat ----------
+  $('toggleSafety').addEventListener('click', () => {
+    const panel = $('safetyPanel');
+    panel.classList.toggle('open');
+    $('toggleSafety').textContent = panel.classList.contains('open') ? '隱藏驗證碼' : '顯示驗證碼';
+  });
+
+  async function sendCurrentMessage(){
+    const input = $('msgInput');
+    const text = input.value.trim();
+    if(!text || !dc || dc.readyState !== 'open') return;
+    const payload = await encryptMsg(sharedKey, text);
+    dc.send(JSON.stringify(payload));
+    addMsg(text, 'me');
+    input.value = '';
+  }
+  $('btnSend').addEventListener('click', sendCurrentMessage);
+  $('msgInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') sendCurrentMessage(); });
+
+  $('btnLeave').addEventListener('click', () => {
+    if(dc) try{ dc.close(); }catch(e){}
+    if(pc) try{ pc.close(); }catch(e){}
+    pc = null; dc = null; sharedKey = null; keyPair = null; role = null;
+    $('messages').innerHTML = '';
+    $('offerCode').value=''; $('answerCode').value='';
+    $('answerInput').value=''; $('offerInput').value='';
+    setStatus('offline', '未連線');
+    showView('landing');
+  });
+
+})();
+</script>
+</body>
+</html>
