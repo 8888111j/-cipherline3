@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- 引入 QR Code 相關庫 -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <style>
   :root{
     --ink:#12141A;
@@ -219,6 +222,7 @@
     position:absolute;top:10px;right:10px;
     padding:6px 10px;font-size:11.5px;
     background:var(--panel);
+    display: flex; gap: 5px; align-items: center;
   }
   .back-link{
     background:none;border:none;color:var(--muted);
@@ -296,7 +300,7 @@
   .msg.me{
     align-self:flex-end;
     background:var(--amber-dim);
-    border:1px solid var(--amber-dim);
+    border:1px solid var(--border);
     border-color:#E8A33D55;
   }
   .msg.peer{
@@ -331,6 +335,33 @@
     text-align:center;
     max-width:640px;
     line-height:1.7;
+  }
+
+  /* QR Code Modal Styles */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: none; justify-content: center; align-items: center;
+    z-index: 1000;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-content {
+    background: var(--panel);
+    padding: 30px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    text-align: center;
+    max-width: 90%;
+  }
+  .qr-container {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 20px 0;
+    display: inline-block;
+  }
+  .qr-container canvas {
+    display: block;
   }
 
   @media (max-width:480px){
@@ -386,17 +417,23 @@
     <button class="back-link" data-back="landing">← 返回</button>
     <div class="step-label">建立頻道 · 步驟 1 / 2</div>
     <h2 class="step-title">產生邀請碼</h2>
-    <p class="step-desc">複製下方邀請碼，透過任何管道（Email、其他通訊軟體、當面）傳送給對方。這段內容已包含你的加密公鑰，本身無法用來讀取你之後的訊息。</p>
+    <p class="step-desc">複製下方邀請碼，透過任何管道傳送給對方。或讓對方掃描二維碼。</p>
     <div class="copy-wrap">
       <textarea class="code-block" id="offerCode" readonly placeholder="產生中…"></textarea>
-      <button class="copy-btn" id="copyOffer">複製</button>
+      <div style="position:absolute; top:10px; right:10px; display:flex; gap:8px;">
+        <button class="copy-btn" id="showQrOffer" style="position:static;">QR碼</button>
+        <button class="copy-btn" id="copyOffer" style="position:static;">複製</button>
+      </div>
     </div>
     <div class="hint" id="offerHint"><span class="spinner"></span> 正在收集連線資訊…</div>
     <div class="field-row" style="margin-top:24px;">
       <div style="flex:1;min-width:220px;">
         <div class="step-label" style="margin-bottom:6px;">步驟 2 / 2</div>
-        <p class="step-desc" style="margin-bottom:10px;">收到對方回覆的「回應碼」後，貼在這裡並連線：</p>
-        <textarea class="code-block" id="answerInput" placeholder="貼上對方的回應碼…"></textarea>
+        <p class="step-desc" style="margin-bottom:10px;">收到對方回覆的「回應碼」後，貼在這裡或從相簿掃描：</p>
+        <div class="copy-wrap">
+          <textarea class="code-block" id="answerInput" placeholder="貼上對方的回應碼…"></textarea>
+          <button class="copy-btn" id="scanGalleryAnswer" style="top:10px; right:10px;">從相簿掃描</button>
+        </div>
       </div>
     </div>
     <div class="field-row">
@@ -410,8 +447,11 @@
     <button class="back-link" data-back="landing">← 返回</button>
     <div class="step-label">加入頻道 · 步驟 1 / 2</div>
     <h2 class="step-title">貼上邀請碼</h2>
-    <p class="step-desc">把對方傳給你的邀請碼貼在這裡。</p>
-    <textarea class="code-block" id="offerInput" placeholder="貼上對方的邀請碼…"></textarea>
+    <p class="step-desc">把對方傳給你的邀請碼貼在這裡，或從相簿掃描二維碼。</p>
+    <div class="copy-wrap">
+      <textarea class="code-block" id="offerInput" placeholder="貼上對方的邀請碼…"></textarea>
+      <button class="copy-btn" id="scanGalleryOffer" style="top:10px; right:10px;">從相簿掃描</button>
+    </div>
     <div class="field-row">
       <button class="primary" id="btnGenAnswer">產生回應碼</button>
       <span class="hint" id="joinHint1"></span>
@@ -422,10 +462,13 @@
   <div class="card view" id="view-join2">
     <div class="step-label">加入頻道 · 步驟 2 / 2</div>
     <h2 class="step-title">傳回回應碼</h2>
-    <p class="step-desc">把下方回應碼傳回給對方，對方貼入後連線就會自動建立。</p>
+    <p class="step-desc">把下方回應碼傳回給對方，或讓對方掃描二維碼。</p>
     <div class="copy-wrap">
       <textarea class="code-block" id="answerCode" readonly placeholder="產生中…"></textarea>
-      <button class="copy-btn" id="copyAnswer">複製</button>
+      <div style="position:absolute; top:10px; right:10px; display:flex; gap:8px;">
+        <button class="copy-btn" id="showQrAnswer" style="position:static;">QR碼</button>
+        <button class="copy-btn" id="copyAnswer" style="position:static;">複製</button>
+      </div>
     </div>
     <div class="hint" id="joinHint2"><span class="spinner"></span> 等待對方連線…</div>
   </div>
@@ -440,385 +483,440 @@
       <button class="safety-toggle" id="toggleSafety">顯示驗證碼</button>
     </div>
     <div class="safety-panel" id="safetyPanel">
-      <p>請透過語音、視訊或其他管道口頭核對這組驗證碼，確認雙方金鑰完全一致、沒有第三方介入（中間人攻擊）。</p>
+      <p>請透過語音、視訊或其他管道口頭核對這組驗證碼，確認雙方金鑰完全一致、沒有被攔截。</p>
       <div class="nixie-row" id="nixieRow"></div>
     </div>
     <div class="messages" id="messages"></div>
     <div class="composer">
       <input type="text" id="msgInput" placeholder="輸入訊息…" autocomplete="off">
-      <button class="primary" id="btnSend">送出</button>
-      <button class="danger leave-btn" id="btnLeave">離開</button>
+      <button class="primary" id="btnSend">傳送</button>
+    </div>
+    <div style="padding:10px 16px; border-top:1px solid var(--border); text-align:center;">
+      <button class="danger ghost leave-btn" id="btnLeave">結束並銷毀通話</button>
     </div>
   </div>
 
   <footer>
-    所有加密與金鑰運算皆在你的瀏覽器內完成，訊息以 ECDH（P-256）+ AES-256-GCM 加密後直接透過 WebRTC 資料通道傳輸。<br>
-    僅使用公用 STUN 伺服器協助建立連線，不經任何訊息伺服器中繼或儲存。嚴格 NAT / 防火牆環境可能無法連線。
+    密語 CIPHERLINE &copy; 2024 · 端對端加密 · P2P 直連<br>
+    金鑰不離身 · 訊息不留痕 · 關閉即消失
   </footer>
 
-<script>
-(function(){
-  "use strict";
+  <!-- QR Code Modal -->
+  <div class="modal-overlay" id="qrModal">
+    <div class="modal-content">
+      <div class="step-label">掃描二維碼</div>
+      <div class="qr-container" id="qrCanvasContainer"></div>
+      <p class="step-desc" style="margin-bottom: 20px;">請對方使用手機掃描此 QR Code</p>
+      <button class="primary" id="closeQrModal">關閉</button>
+    </div>
+  </div>
 
-  // ---------- utils ----------
-  const $ = (id) => document.getElementById(id);
-  const views = ['landing','create1','join1','join2','chat'];
-  function showView(name){
-    views.forEach(v => $('view-'+v).classList.toggle('active', v===name));
-  }
-  function setStatus(state, text){
-    const dot = $('statusDot');
-    dot.className = 'dot ' + state;
-    $('statusText').textContent = text;
-  }
-  function b64encode(str){ return btoa(str); }
-  function b64decode(str){ return atob(str); }
-  function bufToB64(buf){
-    const bytes = new Uint8Array(buf);
-    let bin = '';
-    for (let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin);
-  }
-  function b64ToBuf(b64){
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
-    return bytes.buffer;
-  }
-  async function copyText(text, btn){
-    try{
-      await navigator.clipboard.writeText(text);
-    }catch(e){
-      // fallback
-      const ta = document.createElement('textarea');
-      ta.value = text; document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); document.body.removeChild(ta);
+  <!-- Hidden File Input for Gallery Scanning -->
+  <input type="file" id="galleryInput" accept="image/*" style="display:none;">
+
+  <script>
+  (function(){
+    const $ = id => document.getElementById(id);
+    
+    // ---------- UI Helpers ----------
+    function showView(id){
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      $('view-'+id).classList.add('active');
     }
-    if(btn){
-      const orig = btn.textContent;
-      btn.textContent = '已複製 ✓';
-      setTimeout(()=>btn.textContent = orig, 1400);
+    function setStatus(dotClass, text){
+      const dot = $('statusDot');
+      dot.className = 'dot ' + dotClass;
+      $('statusText').textContent = text;
     }
-  }
-
-  // ---------- scramble hero text ----------
-  (function scramble(){
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const titleEl = $('scrambleTitle');
-    const subEl = $('scrambleSub');
-    const finalTitle = '密語';
-    const finalSub = 'END-TO-END ENCRYPTED CHANNEL';
-    if(reduce){ titleEl.textContent = finalTitle; subEl.textContent = finalSub; return; }
-    const glyphs = 'абвгдαβγδθΣΨΩ01λ⌘※#$%&*+=<>▓▒░'.split('');
-    function run(el, final, duration){
-      const len = final.length;
-      const start = performance.now();
-      function frame(now){
-        const t = Math.min(1, (now-start)/duration);
-        let out = '';
-        for(let i=0;i<len;i++){
-          const charProgress = t*len - i*0.55;
-          if(charProgress >= 1){ out += final[i]; }
-          else if(charProgress <= 0){ out += (final[i]===' ') ? ' ' : glyphs[Math.floor(Math.random()*glyphs.length)]; }
-          else { out += (final[i]===' ') ? ' ' : glyphs[Math.floor(Math.random()*glyphs.length)]; }
-        }
-        el.textContent = out;
-        if(t < 1) requestAnimationFrame(frame); else el.textContent = final;
-      }
-      requestAnimationFrame(frame);
-    }
-    run(titleEl, finalTitle, 900);
-    run(subEl, finalSub, 1200);
-  })();
-
-  // ---------- crypto helpers ----------
-  async function genKeyPair(){
-    return crypto.subtle.generateKey({name:'ECDH', namedCurve:'P-256'}, true, ['deriveKey']);
-  }
-  async function exportPubJwk(publicKey){
-    return crypto.subtle.exportKey('jwk', publicKey);
-  }
-  async function exportPubRaw(publicKey){
-    return crypto.subtle.exportKey('raw', publicKey);
-  }
-  async function importPeerPub(jwk){
-    return crypto.subtle.importKey('jwk', jwk, {name:'ECDH', namedCurve:'P-256'}, true, []);
-  }
-  async function deriveSharedKey(privateKey, peerPublicKey){
-    return crypto.subtle.deriveKey(
-      {name:'ECDH', public: peerPublicKey},
-      privateKey,
-      {name:'AES-GCM', length:256},
-      false,
-      ['encrypt','decrypt']
-    );
-  }
-  async function encryptMsg(key, plaintext){
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(plaintext));
-    return { iv: bufToB64(iv), ct: bufToB64(ct) };
-  }
-  async function decryptMsg(key, payload){
-    const iv = new Uint8Array(b64ToBuf(payload.iv));
-    const ctBuf = b64ToBuf(payload.ct);
-    const plainBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ctBuf);
-    return new TextDecoder().decode(plainBuf);
-  }
-  function compareBytes(a, b){
-    const la = a.length, lb = b.length, l = Math.min(la,lb);
-    for(let i=0;i<l;i++){ if(a[i]!==b[i]) return a[i]-b[i]; }
-    return la-lb;
-  }
-  async function computeSafetyNumber(myRaw, peerRaw){
-    const a = new Uint8Array(myRaw), b = new Uint8Array(peerRaw);
-    const [first, second] = compareBytes(a,b) <= 0 ? [a,b] : [b,a];
-    const concat = new Uint8Array(first.length + second.length);
-    concat.set(first,0); concat.set(second, first.length);
-    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', concat));
-    const bytes = digest.slice(0,10);
-    const digitStr = Array.from(bytes).map(b=>String(b).padStart(3,'0')).join('');
-    const groups = digitStr.match(/.{1,5}/g);
-    return groups;
-  }
-
-  // ---------- WebRTC state ----------
-  const STUN_SERVERS = [{urls:'stun:stun.l.google.com:19302'}, {urls:'stun:stun1.l.google.com:19302'}];
-  function getIceServers(){
-    const servers = STUN_SERVERS.slice();
-    const url = $('turnUrl').value.trim();
-    const user = $('turnUser').value.trim();
-    const cred = $('turnCred').value.trim();
-    if(url){
-      const entry = { urls: url };
-      if(user) entry.username = user;
-      if(cred) entry.credential = cred;
-      servers.push(entry);
-    }
-    return servers;
-  }
-  let pc = null, dc = null, keyPair = null, sharedKey = null, peerPubRaw = null, myPubRaw = null;
-  let role = null;
-
-  // ---------- advanced TURN settings ----------
-  (function initAdvanced(){
-    try{
-      const saved = JSON.parse(localStorage.getItem('cipherline_turn') || '{}');
-      if(saved.url) $('turnUrl').value = saved.url;
-      if(saved.user) $('turnUser').value = saved.user;
-      if(saved.cred) $('turnCred').value = saved.cred;
-    }catch(e){}
-    $('toggleAdvanced').addEventListener('click', () => {
-      const panel = $('advancedPanel');
-      panel.classList.toggle('open');
-      $('toggleAdvanced').textContent = panel.classList.contains('open') ? '隱藏進階設定' : '進階設定（TURN 中繼伺服器）';
-    });
-    ['turnUrl','turnUser','turnCred'].forEach(id => {
-      $(id).addEventListener('change', () => {
-        localStorage.setItem('cipherline_turn', JSON.stringify({
-          url: $('turnUrl').value.trim(),
-          user: $('turnUser').value.trim(),
-          cred: $('turnCred').value.trim()
-        }));
-      });
-    });
-  })();
-
-  function waitIceComplete(peerConn){
-    return new Promise((resolve)=>{
-      if(peerConn.iceGatheringState === 'complete'){ resolve(); return; }
-      const timer = setTimeout(()=>resolve(), 6000); // safety timeout
-      peerConn.addEventListener('icegatheringstatechange', function check(){
-        if(peerConn.iceGatheringState === 'complete'){
-          clearTimeout(timer);
-          peerConn.removeEventListener('icegatheringstatechange', check);
-          resolve();
-        }
-      });
-    });
-  }
-
-  function newPeerConnection(){
-    const conn = new RTCPeerConnection({iceServers: getIceServers()});
-    conn.oniceconnectionstatechange = () => {
-      if(['failed','disconnected','closed'].includes(conn.iceConnectionState)){
-        setStatus('offline', '連線中斷');
-      }
-    };
-    return conn;
-  }
-
-  function setupDataChannelHandlers(channel){
-    channel.onopen = async () => {
-      setStatus('connected', '已連線 · 已加密');
-      await renderSafetyNumber();
-      addSysMsg('安全通道已建立，訊息已使用端對端加密。');
-      showView('chat');
-      $('msgInput').focus();
-    };
-    channel.onclose = () => setStatus('offline', '連線已關閉');
-    channel.onmessage = async (ev) => {
+    async function copyText(text, btn){
       try{
-        const payload = JSON.parse(ev.data);
-        const text = await decryptMsg(sharedKey, payload);
-        addMsg(text, 'peer');
-      }catch(e){
-        console.error('decrypt failed', e);
-      }
-    };
-  }
+        await navigator.clipboard.writeText(text);
+        const old = btn.textContent;
+        btn.textContent = '已複製';
+        setTimeout(()=>btn.textContent=old, 2000);
+      }catch(e){ alert('複製失敗'); }
+    }
+    function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
+    function b64decode(str){ return decodeURIComponent(escape(atob(str))); }
+    function bufToB64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+    function b64ToBuf(b64){ return Uint8Array.from(atob(b64), c=>c.charCodeAt(0)).buffer; }
 
-  async function renderSafetyNumber(){
-    const groups = await computeSafetyNumber(myPubRaw, peerPubRaw);
-    const row = $('nixieRow');
-    row.innerHTML = '';
-    groups.forEach(g => {
-      const d = document.createElement('div');
-      d.className = 'nixie';
-      d.textContent = g;
-      row.appendChild(d);
+    // ---------- QR Code Functions ----------
+    function showQrCode(text) {
+      const container = $('qrCanvasContainer');
+      container.innerHTML = '';
+      const canvas = document.createElement('canvas');
+      container.appendChild(canvas);
+      QRCode.toCanvas(canvas, text, { width: 256, margin: 2 }, function (error) {
+        if (error) console.error(error);
+        $('qrModal').classList.add('active');
+      });
+    }
+
+    $('closeQrModal').addEventListener('click', () => $('qrModal').classList.remove('active'));
+    $('qrModal').addEventListener('click', (e) => { if(e.target === $('qrModal')) $('qrModal').classList.remove('active'); });
+
+    $('showQrOffer').addEventListener('click', () => showQrCode($('offerCode').value));
+    $('showQrAnswer').addEventListener('click', () => showQrCode($('answerCode').value));
+
+    // ---------- Gallery Scanning ----------
+    let targetTextarea = null;
+    function handleGalleryScan(textarea) {
+      targetTextarea = textarea;
+      $('galleryInput').click();
+    }
+
+    $('scanGalleryOffer').addEventListener('click', () => handleGalleryScan($('offerInput')));
+    $('scanGalleryAnswer').addEventListener('click', () => handleGalleryScan($('answerInput')));
+
+    $('galleryInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code) {
+            targetTextarea.value = code.data;
+            // 如果是在加入頁面，掃描後可以自動觸發下一步
+            if (targetTextarea.id === 'offerInput') {
+              $('btnGenAnswer').click();
+            }
+          } else {
+            alert('未能在圖片中找到二維碼，請確保圖片清晰。');
+          }
+          $('galleryInput').value = ''; // Reset
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
     });
-  }
 
-  function addMsg(text, who){
-    const wrap = document.createElement('div');
-    wrap.className = 'msg ' + who;
-    const body = document.createElement('div');
-    body.textContent = text;
-    const meta = document.createElement('span');
-    meta.className = 'meta';
-    meta.textContent = (who==='me' ? '你' : '對方') + ' · ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
-    wrap.appendChild(body); wrap.appendChild(meta);
-    $('messages').appendChild(wrap);
-    $('messages').scrollTop = $('messages').scrollHeight;
-  }
-  function addSysMsg(text){
-    const wrap = document.createElement('div');
-    wrap.className = 'msg sys';
-    wrap.textContent = text;
-    $('messages').appendChild(wrap);
-    $('messages').scrollTop = $('messages').scrollHeight;
-  }
+    // ---------- scramble hero text ----------
+    (function scramble(){
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const titleEl = $('scrambleTitle');
+      const subEl = $('scrambleSub');
+      const finalTitle = '密語';
+      const finalSub = 'END-TO-END ENCRYPTED CHANNEL';
+      if(reduce){ titleEl.textContent = finalTitle; subEl.textContent = finalSub; return; }
+      const glyphs = 'абвгдαβγδθΣΨΩ01λ⌘※#$%&*+=<>▓▒░'.split('');
+      function run(el, final, duration){
+        const len = final.length;
+        const start = performance.now();
+        function frame(now){
+          const t = Math.min(1, (now-start)/duration);
+          let out = '';
+          for(let i=0;i<len;i++){
+            const charProgress = t*len - i*0.55;
+            if(charProgress >= 1){ out += final[i]; }
+            else if(charProgress <= 0){ out += (final[i]===' ') ? ' ' : glyphs[Math.floor(Math.random()*glyphs.length)]; }
+            else { out += (final[i]===' ') ? ' ' : glyphs[Math.floor(Math.random()*glyphs.length)]; }
+          }
+          el.textContent = out;
+          if(t < 1) requestAnimationFrame(frame); else el.textContent = final;
+        }
+        requestAnimationFrame(frame);
+      }
+      run(titleEl, finalTitle, 900);
+      run(subEl, finalSub, 1200);
+    })();
 
-  // ---------- Create (offerer) flow ----------
-  $('btnCreate').addEventListener('click', async () => {
-    showView('create1');
-    setStatus('connecting', '產生邀請碼中…');
-    role = 'offerer';
-    keyPair = await genKeyPair();
-    myPubRaw = await exportPubRaw(keyPair.publicKey);
-    pc = newPeerConnection();
-    dc = pc.createDataChannel('cipherline');
-    setupDataChannelHandlers(dc);
+    // ---------- crypto helpers ----------
+    async function genKeyPair(){
+      return crypto.subtle.generateKey({name:'ECDH', namedCurve:'P-256'}, true, ['deriveKey']);
+    }
+    async function exportPubJwk(publicKey){
+      return crypto.subtle.exportKey('jwk', publicKey);
+    }
+    async function exportPubRaw(publicKey){
+      return crypto.subtle.exportKey('raw', publicKey);
+    }
+    async function importPeerPub(jwk){
+      return crypto.subtle.importKey('jwk', jwk, {name:'ECDH', namedCurve:'P-256'}, true, []);
+    }
+    async function deriveSharedKey(privateKey, peerPublicKey){
+      return crypto.subtle.deriveKey(
+        {name:'ECDH', public: peerPublicKey},
+        privateKey,
+        {name:'AES-GCM', length:256},
+        false,
+        ['encrypt','decrypt']
+      );
+    }
+    async function encryptMsg(key, plaintext){
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(plaintext));
+      return { iv: bufToB64(iv), ct: bufToB64(ct) };
+    }
+    async function decryptMsg(key, payload){
+      const iv = new Uint8Array(b64ToBuf(payload.iv));
+      const ctBuf = b64ToBuf(payload.ct);
+      const plainBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ctBuf);
+      return new TextDecoder().decode(plainBuf);
+    }
+    function compareBytes(a, b){
+      const la = a.length, lb = b.length, l = Math.min(la,lb);
+      for(let i=0;i<l;i++){ if(a[i]!==b[i]) return a[i]-b[i]; }
+      return la-lb;
+    }
+    async function computeSafetyNumber(myRaw, peerRaw){
+      const a = new Uint8Array(myRaw), b = new Uint8Array(peerRaw);
+      const [first, second] = compareBytes(a,b) <= 0 ? [a,b] : [b,a];
+      const concat = new Uint8Array(first.length + second.length);
+      concat.set(first,0); concat.set(second, first.length);
+      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', concat));
+      const bytes = digest.slice(0,10);
+      const digitStr = Array.from(bytes).map(b=>String(b).padStart(3,'0')).join('');
+      const groups = digitStr.match(/.{1,5}/g);
+      return groups;
+    }
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await waitIceComplete(pc);
+    // ---------- WebRTC state ----------
+    const STUN_SERVERS = [{urls:'stun:stun.l.google.com:19302'}, {urls:'stun:stun1.l.google.com:19302'}];
+    function getIceServers(){
+      const servers = STUN_SERVERS.slice();
+      const url = $('turnUrl').value.trim();
+      const user = $('turnUser').value.trim();
+      const cred = $('turnCred').value.trim();
+      if(url){
+        const entry = { urls: url };
+        if(user) entry.username = user;
+        if(cred) entry.credential = cred;
+        servers.push(entry);
+      }
+      return servers;
+    }
+    let pc = null, dc = null, keyPair = null, sharedKey = null, peerPubRaw = null, myPubRaw = null;
+    let role = null;
 
-    const jwk = await exportPubJwk(keyPair.publicKey);
-    const bundle = { t:'offer', sdp: pc.localDescription.sdp, pub: jwk };
-    $('offerCode').value = b64encode(JSON.stringify(bundle));
-    $('offerHint').innerHTML = '✓ 邀請碼已就緒，可以複製傳送了。';
-  });
+    // ---------- advanced TURN settings ----------
+    (function initAdvanced(){
+      try{
+        const saved = JSON.parse(localStorage.getItem('cipherline_turn') || '{}');
+        if(saved.url) $('turnUrl').value = saved.url;
+        if(saved.user) $('turnUser').value = saved.user;
+        if(saved.cred) $('turnCred').value = saved.cred;
+      }catch(e){}
+      $('toggleAdvanced').addEventListener('click', () => {
+        const panel = $('advancedPanel');
+        panel.classList.toggle('open');
+        $('toggleAdvanced').textContent = panel.classList.contains('open') ? '隱藏進階設定' : '進階設定（TURN 中繼伺服器）';
+      });
+      ['turnUrl','turnUser','turnCred'].forEach(id => {
+        $(id).addEventListener('change', () => {
+          localStorage.setItem('cipherline_turn', JSON.stringify({
+            url: $('turnUrl').value.trim(),
+            user: $('turnUser').value.trim(),
+            cred: $('turnCred').value.trim()
+          }));
+        });
+      });
+    })();
 
-  $('copyOffer').addEventListener('click', () => copyText($('offerCode').value, $('copyOffer')));
+    function waitIceComplete(peerConn){
+      return new Promise((resolve)=>{
+        if(peerConn.iceGatheringState === 'complete'){ resolve(); return; }
+        const timer = setTimeout(()=>resolve(), 6000); // safety timeout
+        peerConn.addEventListener('icegatheringstatechange', function check(){
+          if(peerConn.iceGatheringState === 'complete'){
+            clearTimeout(timer);
+            peerConn.removeEventListener('icegatheringstatechange', check);
+            resolve();
+          }
+        });
+      });
+    }
 
-  $('btnConnectOfferer').addEventListener('click', async () => {
-    const raw = $('answerInput').value.trim();
-    const hint = $('connectHintOfferer');
-    if(!raw){ hint.textContent = '請先貼上對方的回應碼'; hint.classList.add('warn'); return; }
-    try{
-      const bundle = JSON.parse(b64decode(raw));
-      if(bundle.t !== 'answer') throw new Error('type mismatch');
+    function newPeerConnection(){
+      const conn = new RTCPeerConnection({iceServers: getIceServers()});
+      conn.oniceconnectionstatechange = () => {
+        if(['failed','disconnected','closed'].includes(conn.iceConnectionState)){
+          setStatus('offline', '連線中斷');
+        }
+      };
+      return conn;
+    }
+
+    function setupDataChannelHandlers(channel){
+      channel.onopen = async () => {
+        setStatus('connected', '已連線 · 已加密');
+        await renderSafetyNumber();
+        addSysMsg('安全通道已建立，訊息已使用端對端加密。');
+        showView('chat');
+        $('msgInput').focus();
+      };
+      channel.onclose = () => setStatus('offline', '連線已關閉');
+      channel.onmessage = async (ev) => {
+        try{
+          const payload = JSON.parse(ev.data);
+          const text = await decryptMsg(sharedKey, payload);
+          addMsg(text, 'peer');
+        }catch(e){
+          console.error('decrypt failed', e);
+        }
+      };
+    }
+
+    async function renderSafetyNumber(){
+      const groups = await computeSafetyNumber(myPubRaw, peerPubRaw);
+      const row = $('nixieRow');
+      row.innerHTML = '';
+      groups.forEach(g => {
+        const d = document.createElement('div');
+        d.className = 'nixie';
+        d.textContent = g;
+        row.appendChild(d);
+      });
+    }
+
+    function addMsg(text, who){
+      const wrap = document.createElement('div');
+      wrap.className = 'msg ' + who;
+      const body = document.createElement('div');
+      body.textContent = text;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = (who==='me' ? '你' : '對方') + ' · ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+      wrap.appendChild(body); wrap.appendChild(meta);
+      $('messages').appendChild(wrap);
+      $('messages').scrollTop = $('messages').scrollHeight;
+    }
+    function addSysMsg(text){
+      const wrap = document.createElement('div');
+      wrap.className = 'msg sys';
+      wrap.textContent = text;
+      $('messages').appendChild(wrap);
+      $('messages').scrollTop = $('messages').scrollHeight;
+    }
+
+    // ---------- Create (offerer) flow ----------
+    $('btnCreate').addEventListener('click', async () => {
+      showView('create1');
+      setStatus('connecting', '產生邀請碼中…');
+      role = 'offerer';
+      keyPair = await genKeyPair();
+      myPubRaw = await exportPubRaw(keyPair.publicKey);
+      pc = newPeerConnection();
+      dc = pc.createDataChannel('cipherline');
+      setupDataChannelHandlers(dc);
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await waitIceComplete(pc);
+
+      const jwk = await exportPubJwk(keyPair.publicKey);
+      const bundle = { t:'offer', sdp: pc.localDescription.sdp, pub: jwk };
+      $('offerCode').value = b64encode(JSON.stringify(bundle));
+      $('offerHint').innerHTML = '✓ 邀請碼已就緒，可以複製傳送了。';
+    });
+
+    $('copyOffer').addEventListener('click', () => copyText($('offerCode').value, $('copyOffer')));
+
+    $('btnConnectOfferer').addEventListener('click', async () => {
+      const raw = $('answerInput').value.trim();
+      const hint = $('connectHintOfferer');
+      if(!raw){ hint.textContent = '請先貼上對方的回應碼'; hint.classList.add('warn'); return; }
+      try{
+        const bundle = JSON.parse(b64decode(raw));
+        if(bundle.t !== 'answer') throw new Error('type mismatch');
+        const peerPubKey = await importPeerPub(bundle.pub);
+        peerPubRaw = await exportPubRaw(peerPubKey);
+        sharedKey = await deriveSharedKey(keyPair.privateKey, peerPubKey);
+        await pc.setRemoteDescription({type:'answer', sdp: bundle.sdp});
+        hint.textContent = '連線中…';
+        hint.classList.remove('warn');
+      }catch(e){
+        console.error(e);
+        hint.textContent = '回應碼格式錯誤，請確認完整複製貼上。';
+        hint.classList.add('warn');
+      }
+    });
+
+    // ---------- Join (answerer) flow ----------
+    $('btnJoin').addEventListener('click', () => { showView('join1'); });
+
+    $('btnGenAnswer').addEventListener('click', async () => {
+      const raw = $('offerInput').value.trim();
+      const hint = $('joinHint1');
+      if(!raw){ hint.textContent = '請先貼上邀請碼'; hint.classList.add('warn'); return; }
+      let bundle;
+      try{
+        bundle = JSON.parse(b64decode(raw));
+        if(bundle.t !== 'offer') throw new Error('type mismatch');
+      }catch(e){
+        hint.textContent = '邀請碼格式錯誤，請確認完整複製貼上。';
+        hint.classList.add('warn');
+        return;
+      }
+      hint.textContent = '';
+      role = 'answerer';
+      setStatus('connecting', '建立連線中…');
+      keyPair = await genKeyPair();
+      myPubRaw = await exportPubRaw(keyPair.publicKey);
       const peerPubKey = await importPeerPub(bundle.pub);
       peerPubRaw = await exportPubRaw(peerPubKey);
       sharedKey = await deriveSharedKey(keyPair.privateKey, peerPubKey);
-      await pc.setRemoteDescription({type:'answer', sdp: bundle.sdp});
-      hint.textContent = '連線中…';
-      hint.classList.remove('warn');
-    }catch(e){
-      console.error(e);
-      hint.textContent = '回應碼格式錯誤，請確認完整複製貼上。';
-      hint.classList.add('warn');
+
+      pc = newPeerConnection();
+      pc.ondatachannel = (ev) => { dc = ev.channel; setupDataChannelHandlers(dc); };
+
+      await pc.setRemoteDescription({type:'offer', sdp: bundle.sdp});
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await waitIceComplete(pc);
+
+      const jwk = await exportPubJwk(keyPair.publicKey);
+      const outBundle = { t:'answer', sdp: pc.localDescription.sdp, pub: jwk };
+      $('answerCode').value = b64encode(JSON.stringify(outBundle));
+      showView('join2');
+    });
+
+    $('copyAnswer').addEventListener('click', () => copyText($('answerCode').value, $('copyAnswer')));
+
+    // ---------- back links ----------
+    document.querySelectorAll('[data-back]').forEach(btn=>{
+      btn.addEventListener('click', () => showView(btn.dataset.back));
+    });
+
+    // ---------- chat ----------
+    $('toggleSafety').addEventListener('click', () => {
+      const panel = $('safetyPanel');
+      panel.classList.toggle('open');
+      $('toggleSafety').textContent = panel.classList.contains('open') ? '隱藏驗證碼' : '顯示驗證碼';
+    });
+
+    async function sendCurrentMessage(){
+      const input = $('msgInput');
+      const text = input.value.trim();
+      if(!text || !dc || dc.readyState !== 'open') return;
+      const payload = await encryptMsg(sharedKey, text);
+      dc.send(JSON.stringify(payload));
+      addMsg(text, 'me');
+      input.value = '';
     }
-  });
+    $('btnSend').addEventListener('click', sendCurrentMessage);
+    $('msgInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') sendCurrentMessage(); });
 
-  // ---------- Join (answerer) flow ----------
-  $('btnJoin').addEventListener('click', () => { showView('join1'); });
+    $('btnLeave').addEventListener('click', () => {
+      if(dc) try{ dc.close(); }catch(e){}
+      if(pc) try{ pc.close(); }catch(e){}
+      pc = null; dc = null; sharedKey = null; keyPair = null; role = null;
+      $('messages').innerHTML = '';
+      $('offerCode').value=''; $('answerCode').value='';
+      $('answerInput').value=''; $('offerInput').value='';
+      setStatus('offline', '未連線');
+      showView('landing');
+    });
 
-  $('btnGenAnswer').addEventListener('click', async () => {
-    const raw = $('offerInput').value.trim();
-    const hint = $('joinHint1');
-    if(!raw){ hint.textContent = '請先貼上邀請碼'; hint.classList.add('warn'); return; }
-    let bundle;
-    try{
-      bundle = JSON.parse(b64decode(raw));
-      if(bundle.t !== 'offer') throw new Error('type mismatch');
-    }catch(e){
-      hint.textContent = '邀請碼格式錯誤，請確認完整複製貼上。';
-      hint.classList.add('warn');
-      return;
-    }
-    hint.textContent = '';
-    role = 'answerer';
-    setStatus('connecting', '建立連線中…');
-    keyPair = await genKeyPair();
-    myPubRaw = await exportPubRaw(keyPair.publicKey);
-    const peerPubKey = await importPeerPub(bundle.pub);
-    peerPubRaw = await exportPubRaw(peerPubKey);
-    sharedKey = await deriveSharedKey(keyPair.privateKey, peerPubKey);
-
-    pc = newPeerConnection();
-    pc.ondatachannel = (ev) => { dc = ev.channel; setupDataChannelHandlers(dc); };
-
-    await pc.setRemoteDescription({type:'offer', sdp: bundle.sdp});
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    await waitIceComplete(pc);
-
-    const jwk = await exportPubJwk(keyPair.publicKey);
-    const outBundle = { t:'answer', sdp: pc.localDescription.sdp, pub: jwk };
-    $('answerCode').value = b64encode(JSON.stringify(outBundle));
-    showView('join2');
-  });
-
-  $('copyAnswer').addEventListener('click', () => copyText($('answerCode').value, $('copyAnswer')));
-
-  // ---------- back links ----------
-  document.querySelectorAll('[data-back]').forEach(btn=>{
-    btn.addEventListener('click', () => showView(btn.dataset.back));
-  });
-
-  // ---------- chat ----------
-  $('toggleSafety').addEventListener('click', () => {
-    const panel = $('safetyPanel');
-    panel.classList.toggle('open');
-    $('toggleSafety').textContent = panel.classList.contains('open') ? '隱藏驗證碼' : '顯示驗證碼';
-  });
-
-  async function sendCurrentMessage(){
-    const input = $('msgInput');
-    const text = input.value.trim();
-    if(!text || !dc || dc.readyState !== 'open') return;
-    const payload = await encryptMsg(sharedKey, text);
-    dc.send(JSON.stringify(payload));
-    addMsg(text, 'me');
-    input.value = '';
-  }
-  $('btnSend').addEventListener('click', sendCurrentMessage);
-  $('msgInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') sendCurrentMessage(); });
-
-  $('btnLeave').addEventListener('click', () => {
-    if(dc) try{ dc.close(); }catch(e){}
-    if(pc) try{ pc.close(); }catch(e){}
-    pc = null; dc = null; sharedKey = null; keyPair = null; role = null;
-    $('messages').innerHTML = '';
-    $('offerCode').value=''; $('answerCode').value='';
-    $('answerInput').value=''; $('offerInput').value='';
-    setStatus('offline', '未連線');
-    showView('landing');
-  });
-
-})();
-</script>
+  })();
+  </script>
 </body>
 </html>
