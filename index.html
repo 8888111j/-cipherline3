@@ -347,6 +347,27 @@
   .composer-btn svg { width: 20px; height: 20px; fill: currentColor; }
   .leave-btn{margin-top:0;}
 
+  /* ---------- Mail view ---------- */
+  .mail-card { padding: 0; overflow: hidden; }
+  .mail-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+  }
+  .mail-list { height: 400px; overflow-y: auto; }
+  .mail-item {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.2s;
+  }
+  .mail-item:hover { background: var(--panel-2); }
+  .mail-item .subject { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .mail-item .from { font-size: 12px; color: var(--amber); font-family: 'IBM Plex Mono', monospace; }
+  .mail-item .date { float: right; font-size: 11px; color: var(--muted); }
+  .mail-content-view { padding: 20px; display: none; height: 400px; overflow-y: auto; }
+  .mail-content-view.active { display: block; }
+  .mail-content-view h3 { margin-top: 0; font-family: 'Fraunces', serif; }
+  .mail-compose { padding: 20px; display: none; }
+  .mail-compose.active { display: block; }
+
   footer{
     margin-top:30px;
     font-family:'IBM Plex Mono',monospace;
@@ -408,7 +429,10 @@
 
   <div class="topbar">
     <div class="brand"><span class="diamond"></span> CIPHERLINE</div>
-    <div class="status-pill"><span class="dot offline" id="statusDot"></span><span id="statusText">未連線</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button class="ghost" id="navMail" style="padding: 5px 10px; font-size: 11px;">密語郵箱</button>
+      <div class="status-pill"><span class="dot offline" id="statusDot"></span><span id="statusText">未連線</span></div>
+    </div>
   </div>
 
   <!-- LANDING -->
@@ -538,6 +562,36 @@
     </div>
   </div>
 
+  <!-- MAIL VIEW -->
+  <div class="card mail-card view" id="view-mail">
+    <div class="mail-header">
+      <button class="back-link" data-back="landing" style="margin-bottom: 0;">← 返回</button>
+      <div class="step-label" id="myMailAddr" style="margin-bottom: 0;">myname@cipherline.com</div>
+      <button class="primary" id="btnComposeMail" style="padding: 6px 12px; font-size: 12px;">寫郵件</button>
+    </div>
+    <div id="mailList" class="mail-list">
+      <!-- 模擬郵件列表 -->
+      <div class="mail-item">
+        <span class="date">剛剛</span>
+        <div class="subject">歡迎使用密語郵箱</div>
+        <div class="from">system@cipherline.com</div>
+      </div>
+    </div>
+    <div id="mailContentView" class="mail-content-view">
+      <button class="back-link" id="backToMailList">← 返回列表</button>
+      <h3 id="mailSubject"></h3>
+      <div id="mailMeta" class="step-label"></div>
+      <div id="mailBody" style="margin-top: 20px; line-height: 1.6; white-space: pre-wrap;"></div>
+    </div>
+    <div id="mailCompose" class="mail-compose">
+      <button class="back-link" id="cancelCompose">← 取消</button>
+      <input type="text" id="mailTo" placeholder="收件人 (xxx@cipherline.com)" style="margin-bottom: 10px;">
+      <input type="text" id="mailSubj" placeholder="主題" style="margin-bottom: 10px;">
+      <textarea id="mailMsg" placeholder="內容..." style="height: 180px;"></textarea>
+      <button class="primary" id="sendMail" style="margin-top: 15px; width: 100%;">發送加密郵件</button>
+    </div>
+  </div>
+
   <footer>
     密語 CIPHERLINE &copy; 2024 · 端對端加密 · P2P 直連<br>
     金鑰不離身 · 訊息不留痕 · 關閉即消失
@@ -646,15 +700,13 @@
     $('chatImageInput').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      // 限制圖片大小以適應 WebRTC DataChannel (通常建議 64KB 以下，或者分片)
-      // 這裡簡化處理：壓縮圖片
       const reader = new FileReader();
       reader.onload = async (event) => {
         const img = new Image();
         img.onload = async () => {
           const canvas = document.createElement('canvas');
           let width = img.width, height = img.height;
-          const max = 800; // 最大寬度或高度
+          const max = 800;
           if (width > max || height > max) {
             if (width > height) { height *= max / width; width = max; }
             else { width *= max / height; height = max; }
@@ -670,7 +722,7 @@
       $('chatImageInput').value = '';
     });
 
-    // Voice Recording
+    // Voice Recording Fix
     let mediaRecorder = null;
     let audioChunks = [];
     let recStartTime = 0;
@@ -679,11 +731,16 @@
     async function startRecording() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
+        // 強制使用更通用的編碼格式
+        const options = { mimeType: 'audio/webm;codecs=opus' };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          delete options.mimeType; // 回退到默認
+        }
+        mediaRecorder = new MediaRecorder(stream, options);
         audioChunks = [];
-        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
         mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
           const reader = new FileReader();
           reader.onload = () => sendMedia('voice', reader.result);
           reader.readAsDataURL(audioBlob);
@@ -713,7 +770,6 @@
       $('recTime').textContent = `${m}:${s}`;
     }
 
-    // 按住錄音，放開結束 (兼容桌面與移動端)
     const voiceBtn = $('btnVoice');
     voiceBtn.addEventListener('mousedown', startRecording);
     window.addEventListener('mouseup', stopRecording);
@@ -726,6 +782,70 @@
       dc.send(JSON.stringify(payload));
       addMsg({ type, data: dataUrl }, 'me');
     }
+
+    // ---------- Mail Logic ----------
+    const mails = [
+      { id: 1, from: 'system@cipherline.com', subject: '歡迎使用密語郵箱', body: '您的專屬加密郵箱已開通。\n\n所有發往 @cipherline.com 的郵件均通過 P2P 通道進行端對端加密傳輸。\n\n請注意：郵箱功能目前僅在雙方同時在線建立頻道後可用。', date: '剛剛' }
+    ];
+    let myEmail = '';
+
+    $('navMail').addEventListener('click', () => {
+      if (!myEmail) {
+        const name = Math.random().toString(36).substring(7);
+        myEmail = name + '@cipherline.com';
+        $('myMailAddr').textContent = myEmail;
+      }
+      renderMailList();
+      showView('mail');
+    });
+
+    function renderMailList() {
+      const list = $('mailList');
+      list.innerHTML = '';
+      mails.slice().reverse().forEach(m => {
+        const item = document.createElement('div');
+        item.className = 'mail-item';
+        item.innerHTML = `<span class="date">${m.date}</span><div class="subject">${m.subject}</div><div class="from">${m.from}</div>`;
+        item.onclick = () => showMailContent(m);
+        list.appendChild(item);
+      });
+      list.style.display = 'block';
+      $('mailContentView').classList.remove('active');
+      $('mailCompose').classList.remove('active');
+    }
+
+    function showMailContent(m) {
+      $('mailList').style.display = 'none';
+      $('mailContentView').classList.add('active');
+      $('mailSubject').textContent = m.subject;
+      $('mailMeta').textContent = `發件人: ${m.from} | 時間: ${m.date}`;
+      $('mailBody').textContent = m.body;
+    }
+
+    $('backToMailList').addEventListener('click', () => renderMailList());
+    $('btnComposeMail').addEventListener('click', () => {
+      $('mailList').style.display = 'none';
+      $('mailCompose').classList.add('active');
+    });
+    $('cancelCompose').addEventListener('click', () => renderMailList());
+
+    $('sendMail').addEventListener('click', async () => {
+      const to = $('mailTo').value.trim();
+      const subj = $('mailSubj').value.trim();
+      const body = $('mailMsg').value.trim();
+      if (!to || !subj || !body) return alert('請填寫完整');
+      
+      // 如果已建立 P2P 頻道，模擬發送
+      if (dc && dc.readyState === 'open') {
+        const mailObj = { type: 'mail', to, from: myEmail, subject: subj, body, date: new Date().toLocaleTimeString() };
+        const payload = await encryptMsg(sharedKey, JSON.stringify(mailObj));
+        dc.send(JSON.stringify(payload));
+        alert('郵件已通過加密通道發送');
+        renderMailList();
+      } else {
+        alert('請先建立 P2P 安全頻道以發送加密郵件');
+      }
+    });
 
     // ---------- scramble hero text ----------
     (function scramble(){
@@ -890,6 +1010,10 @@
             const obj = JSON.parse(text);
             if (obj.type === 'image' || obj.type === 'voice') {
               addMsg(obj, 'peer');
+            } else if (obj.type === 'mail') {
+              mails.push(obj);
+              if ($('view-mail').classList.contains('active')) renderMailList();
+              addSysMsg('您收到一封新的加密郵件');
             } else {
               addMsg(text, 'peer');
             }
@@ -930,6 +1054,8 @@
         const audio = document.createElement('audio');
         audio.controls = true;
         audio.src = content.data;
+        // 自動載入以修復某些瀏覽器的播放問題
+        audio.load();
         body.appendChild(audio);
       }
 
