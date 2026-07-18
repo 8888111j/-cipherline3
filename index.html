@@ -347,26 +347,68 @@
   .composer-btn svg { width: 20px; height: 20px; fill: currentColor; }
   .leave-btn{margin-top:0;}
 
-  /* ---------- Mail view ---------- */
-  .mail-card { padding: 0; overflow: hidden; }
-  .mail-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 16px 20px; border-bottom: 1px solid var(--border);
+  /* ---------- Mail icon + animated dropdown panel ---------- */
+  .mail-icon-wrap{ position:relative; }
+  .icon-btn{
+    position:relative;
+    width:34px;height:34px;padding:0;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:8px;font-size:16px;line-height:1;
+    background:transparent;border:1px solid var(--border);
   }
-  .mail-list { height: 400px; overflow-y: auto; }
+  .icon-btn:hover{ border-color:var(--amber); }
+  .mail-badge{
+    position:absolute;top:-6px;right:-6px;
+    min-width:16px;height:16px;padding:0 4px;
+    border-radius:999px;background:var(--red);color:#fff;
+    font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;
+    line-height:1;box-shadow:0 0 0 2px var(--ink);
+  }
+  .mail-panel{
+    position:absolute; top:calc(100% + 12px); right:0;
+    width:min(360px,88vw);
+    background:linear-gradient(180deg,var(--panel),#171B24);
+    border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:0 20px 50px rgba(0,0,0,.45);
+    max-height:0; opacity:0; overflow:hidden; pointer-events:none;
+    transform-origin:top right; transform:scale(.92) translateY(-10px);
+    transition:max-height .38s cubic-bezier(.34,1.15,.64,1), opacity .22s ease, transform .3s cubic-bezier(.34,1.15,.64,1);
+    z-index:200; text-align:left;
+  }
+  .mail-panel.open{
+    max-height:520px; opacity:1; pointer-events:auto; transform:scale(1) translateY(0);
+  }
+  .mail-panel-header{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 16px; border-bottom:1px solid var(--border); gap:8px;
+  }
+  .mail-panel-header .addr{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--amber);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .mail-close{
+    background:none;border:none;color:var(--muted);font-size:18px;
+    padding:0;width:24px;height:24px;line-height:1;border-radius:6px;flex-shrink:0;
+  }
+  .mail-close:hover{ color:var(--paper); background:var(--panel-2); }
+  .mail-toolbar{ display:flex; justify-content:flex-end; padding:8px 16px; border-bottom:1px solid var(--border); }
+  .mail-list { max-height:340px; overflow-y: auto; }
   .mail-item {
-    padding: 16px 20px; border-bottom: 1px solid var(--border);
-    cursor: pointer; transition: background 0.2s;
+    padding: 13px 16px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.15s;
   }
+  .mail-item.unread .subject::before{ content:'●'; color:var(--teal); font-size:8px; margin-right:6px; }
   .mail-item:hover { background: var(--panel-2); }
-  .mail-item .subject { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
-  .mail-item .from { font-size: 12px; color: var(--amber); font-family: 'IBM Plex Mono', monospace; }
-  .mail-item .date { float: right; font-size: 11px; color: var(--muted); }
-  .mail-content-view { padding: 20px; display: none; height: 400px; overflow-y: auto; }
+  .mail-item .subject { font-weight: 600; font-size: 13.5px; margin-bottom: 3px; }
+  .mail-item .from { font-size: 11px; color: var(--amber); font-family: 'IBM Plex Mono', monospace; }
+  .mail-item .date { float: right; font-size: 10.5px; color: var(--muted); }
+  .mail-content-view { padding: 16px; display: none; max-height: 400px; overflow-y: auto; }
   .mail-content-view.active { display: block; }
-  .mail-content-view h3 { margin-top: 0; font-family: 'Fraunces', serif; }
-  .mail-compose { padding: 20px; display: none; }
+  .mail-content-view h3 { margin-top: 0; margin-bottom:8px; font-family: 'Fraunces', serif; font-size:17px; }
+  .mail-compose { padding: 16px; display: none; }
   .mail-compose.active { display: block; }
+  .mail-compose input, .mail-compose textarea{ font-size:12.5px; }
 
   footer{
     margin-top:30px;
@@ -430,7 +472,34 @@
   <div class="topbar">
     <div class="brand"><span class="diamond"></span> CIPHERLINE</div>
     <div style="display: flex; gap: 10px; align-items: center;">
-      <button class="ghost" id="navMail" style="padding: 5px 10px; font-size: 11px;">密語郵箱</button>
+      <div class="mail-icon-wrap" id="mailIconWrap">
+        <button class="icon-btn" id="navMail" aria-label="密語郵箱" title="密語郵箱">
+          ✉️<span class="mail-badge" id="mailBadge" style="display:none;">0</span>
+        </button>
+        <div class="mail-panel" id="mailPanel">
+          <div class="mail-panel-header">
+            <span class="addr" id="myMailAddr">尚未產生位址</span>
+            <button class="mail-close" id="mailCloseBtn" aria-label="關閉">×</button>
+          </div>
+          <div class="mail-toolbar">
+            <button class="ghost" id="btnComposeMail" style="padding:5px 10px;font-size:11.5px;">✎ 寫郵件</button>
+          </div>
+          <div id="mailList" class="mail-list"></div>
+          <div id="mailContentView" class="mail-content-view">
+            <button class="back-link" id="backToMailList" style="margin-bottom:12px;">← 返回列表</button>
+            <h3 id="mailSubject"></h3>
+            <div id="mailMeta" class="step-label" style="margin-bottom:0;"></div>
+            <div id="mailBody" style="margin-top:16px; line-height:1.6; white-space:pre-wrap; font-size:13.5px;"></div>
+          </div>
+          <div id="mailCompose" class="mail-compose">
+            <button class="back-link" id="cancelCompose" style="margin-bottom:12px;">← 取消</button>
+            <input type="text" id="mailTo" placeholder="收件人 (xxx@cipherline.com)" style="margin-bottom:10px;">
+            <input type="text" id="mailSubj" placeholder="主題" style="margin-bottom:10px;">
+            <textarea id="mailMsg" placeholder="內容..." style="height:140px;"></textarea>
+            <button class="primary" id="sendMail" style="margin-top:12px;width:100%;">發送加密郵件</button>
+          </div>
+        </div>
+      </div>
       <div class="status-pill"><span class="dot offline" id="statusDot"></span><span id="statusText">未連線</span></div>
     </div>
   </div>
@@ -559,36 +628,6 @@
     </div>
     <div style="padding:10px 16px; border-top:1px solid var(--border); text-align:center;">
       <button class="danger ghost leave-btn" id="btnLeave">結束並銷毀通話</button>
-    </div>
-  </div>
-
-  <!-- MAIL VIEW -->
-  <div class="card mail-card view" id="view-mail">
-    <div class="mail-header">
-      <button class="back-link" data-back="landing" style="margin-bottom: 0;">← 返回</button>
-      <div class="step-label" id="myMailAddr" style="margin-bottom: 0;">myname@cipherline.com</div>
-      <button class="primary" id="btnComposeMail" style="padding: 6px 12px; font-size: 12px;">寫郵件</button>
-    </div>
-    <div id="mailList" class="mail-list">
-      <!-- 模擬郵件列表 -->
-      <div class="mail-item">
-        <span class="date">剛剛</span>
-        <div class="subject">歡迎使用密語郵箱</div>
-        <div class="from">system@cipherline.com</div>
-      </div>
-    </div>
-    <div id="mailContentView" class="mail-content-view">
-      <button class="back-link" id="backToMailList">← 返回列表</button>
-      <h3 id="mailSubject"></h3>
-      <div id="mailMeta" class="step-label"></div>
-      <div id="mailBody" style="margin-top: 20px; line-height: 1.6; white-space: pre-wrap;"></div>
-    </div>
-    <div id="mailCompose" class="mail-compose">
-      <button class="back-link" id="cancelCompose">← 取消</button>
-      <input type="text" id="mailTo" placeholder="收件人 (xxx@cipherline.com)" style="margin-bottom: 10px;">
-      <input type="text" id="mailSubj" placeholder="主題" style="margin-bottom: 10px;">
-      <textarea id="mailMsg" placeholder="內容..." style="height: 180px;"></textarea>
-      <button class="primary" id="sendMail" style="margin-top: 15px; width: 100%;">發送加密郵件</button>
     </div>
   </div>
 
@@ -785,18 +824,49 @@
 
     // ---------- Mail Logic ----------
     const mails = [
-      { id: 1, from: 'system@cipherline.com', subject: '歡迎使用密語郵箱', body: '您的專屬加密郵箱已開通。\n\n所有發往 @cipherline.com 的郵件均通過 P2P 通道進行端對端加密傳輸。\n\n請注意：郵箱功能目前僅在雙方同時在線建立頻道後可用。', date: '剛剛' }
+      { id: 1, from: 'system@cipherline.com', subject: '歡迎使用密語郵箱', body: '您的專屬加密郵箱已開通。\n\n所有發往 @cipherline.com 的郵件均通過 P2P 通道進行端對端加密傳輸。\n\n請注意：郵箱功能目前僅在雙方同時在線建立頻道後可用。', date: '剛剛', read: false }
     ];
     let myEmail = '';
+    let mailPanelOpen = false;
 
-    $('navMail').addEventListener('click', () => {
-      if (!myEmail) {
-        const name = Math.random().toString(36).substring(7);
-        myEmail = name + '@cipherline.com';
-        $('myMailAddr').textContent = myEmail;
+    function updateMailBadge(){
+      const unread = mails.filter(m => !m.read).length;
+      const badge = $('mailBadge');
+      if (unread > 0) {
+        badge.style.display = 'flex';
+        badge.textContent = unread > 9 ? '9+' : String(unread);
+      } else {
+        badge.style.display = 'none';
       }
+    }
+    updateMailBadge();
+
+    function openMailPanel(){
+      if (!myEmail) {
+        const name = Math.random().toString(36).substring(2, 8);
+        myEmail = name + '@cipherline.com';
+      }
+      $('myMailAddr').textContent = myEmail;
+      mails.forEach(m => m.read = true);
+      updateMailBadge();
       renderMailList();
-      showView('mail');
+      $('mailPanel').classList.add('open');
+      mailPanelOpen = true;
+    }
+    function closeMailPanel(){
+      $('mailPanel').classList.remove('open');
+      mailPanelOpen = false;
+    }
+    $('navMail').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (mailPanelOpen) closeMailPanel(); else openMailPanel();
+    });
+    $('mailCloseBtn').addEventListener('click', (e) => { e.stopPropagation(); closeMailPanel(); });
+    document.addEventListener('click', (e) => {
+      if (mailPanelOpen && !$('mailIconWrap').contains(e.target)) closeMailPanel();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && mailPanelOpen) closeMailPanel();
     });
 
     function renderMailList() {
@@ -804,9 +874,9 @@
       list.innerHTML = '';
       mails.slice().reverse().forEach(m => {
         const item = document.createElement('div');
-        item.className = 'mail-item';
+        item.className = 'mail-item' + (m.read ? '' : ' unread');
         item.innerHTML = `<span class="date">${m.date}</span><div class="subject">${m.subject}</div><div class="from">${m.from}</div>`;
-        item.onclick = () => showMailContent(m);
+        item.onclick = () => { m.read = true; updateMailBadge(); showMailContent(m); };
         list.appendChild(item);
       });
       list.style.display = 'block';
@@ -1011,8 +1081,10 @@
             if (obj.type === 'image' || obj.type === 'voice') {
               addMsg(obj, 'peer');
             } else if (obj.type === 'mail') {
+              obj.read = mailPanelOpen;
               mails.push(obj);
-              if ($('view-mail').classList.contains('active')) renderMailList();
+              updateMailBadge();
+              if (mailPanelOpen) renderMailList();
               addSysMsg('您收到一封新的加密郵件');
             } else {
               addMsg(text, 'peer');
